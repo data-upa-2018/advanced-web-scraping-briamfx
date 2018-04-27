@@ -6,9 +6,11 @@
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.utils.response import response_status_message
 
 
-class TekohaSpiderMiddleware(object):
+class ScrapyDemoSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the spider middleware does not modify the
     # passed objects.
@@ -56,7 +58,7 @@ class TekohaSpiderMiddleware(object):
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-class TekohaDownloaderMiddleware(object):
+class ScrapyDemoDownloaderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the downloader middleware does not modify the
     # passed objects.
@@ -101,3 +103,18 @@ class TekohaDownloaderMiddleware(object):
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+
+class CustomRetryMiddleware(RetryMiddleware):
+
+    def process_response(self, request, response, spider):
+        if request.meta.get('dont_retry', False):
+            return response
+        if response.status in self.retry_http_codes:
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider) or response
+
+        # this is your check
+        if response.status == 200 and not response.text:
+            return self._retry(request, 'empty response'.format(spider.retry_xpath), spider) or response
+        return response
